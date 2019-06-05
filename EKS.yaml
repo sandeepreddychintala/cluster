@@ -1,0 +1,94 @@
+Parameters:
+  ClusterName:
+    Description: The cluster name provided when the cluster was created.  If it is incorrect, nodes will not be able to join the cluster.
+    Type: String
+    Default: MydemoEksCluster
+
+  ClusterVersion:
+    Description: Cluster Version
+    Type: String
+    Default: "latest"
+    AllowedValues:
+      - "1.10"
+      - "1.11"
+      - "1.12"
+      - "latest"
+    
+  VpcId:
+    Description: The VPC of the worker instances
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-03542d159aaf047da
+
+  #SubnetIds:
+   # Description: Select 3 subnets where workers can be created.
+    #Type: CommaDelimitedList  #List<AWS::EC2::Subnet::Id>
+    # Values: [subnet-00e2b2c1777a444fb, subnet-03b57ca4a69edef8a]
+    #- subnet-00e2b2c1777a444fb
+    #- subnet-03b57ca4a69edef8a
+    #Default: subnet-00e2b2c1777a444fb
+
+Conditions:
+  CreateLatestVersionCluster: !Equals [ !Ref ClusterVersion, latest ]
+  CreateCustomVersionCluster: !Not [!Equals [!Ref ClusterVersion, latest]]
+  
+Resources:
+  EKSCluster:
+    Type: "AWS::EKS::Cluster"
+    Properties:
+      Name: !Ref ClusterName
+      ResourcesVpcConfig:
+        SecurityGroupIds: 
+          - !Ref ControlPlaneSecurityGroup
+        SubnetIds: [subnet-004dccceb6769a765, subnet-0334b8fdda843c80b]  #!Ref SubnetIds   #[subnet-0e3b73a568d3439cf, subnet-0c5e6abe4077d546b]    #!Ref SubnetIds
+        #- subnet-00e2b2c1777a444fb
+        #- subnet-03b57ca4a69edef8a    #!Ref SubnetIds
+      RoleArn: !GetAtt EksServiceRole.Arn
+      Version:
+         Fn::If:
+          - CreateCustomVersionCluster
+          - !Ref ClusterVersion
+          - !Ref AWS::NoValue
+        
+      
+  ControlPlaneSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cluster communication with worker nodes
+      VpcId: !Ref VpcId
+      
+  EksServiceRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "eks.amazonaws.com"
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
+      RoleName: delegate-admin-eks-role
+
+
+
+
+#Ekscluster:
+ # Type: AWS::EKS::Cluster
+  #Properties:
+   # Name: Ekscluster
+    #Version: '1.11'
+  #  RoleArn: arn:aws:iam::397929331209:role/EKSRole
+   # VpcId: vpc-03542d159aaf047da
+    #ResourcesVpcConfig:
+     # SecurityGroupIds:
+      #- sg-0162558e172121b70
+     # SubnetIds:
+      #- subnet-00e2b2c1777a444fb
+      #- subnet-03b57ca4a69edef8a
